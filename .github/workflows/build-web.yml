@@ -36,14 +36,9 @@ jobs:
         working-directory: apps/readest-app
         run: pnpm build-web
 
-      - name: Create archive
-        run: |
-          cd apps/readest-app
-          zip -r ../../readest-web.zip .next
-
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
           name: readest-web-${{ github.sha }}
-          path: readest-web.zip
+          path: apps/readest-app/out
           retention-days: 30

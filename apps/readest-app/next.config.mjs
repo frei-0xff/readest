@@ -13,7 +13,8 @@ if (isDev) {
   initOpenNextCloudflareForDev();
 }
 
-const exportOutput = appPlatform !== 'web' && !isDev;
+// const exportOutput = appPlatform !== 'web' && !isDev;
+const exportOutput = !isDev;
 // Opt-in standalone output, set only by the Docker production build
 // (Dockerfile). Every other path keeps the original behavior: Tauri `export`,
 // local `build-web` (output undefined), dev, and the Cloudflare/OpenNext
