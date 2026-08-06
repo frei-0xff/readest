@@ -1,8 +1,8 @@
-import type { Metadata } from 'next'
-import { Suspense } from 'react'
+import type { Metadata } from 'next';
+import { Suspense } from 'react';
 // import { READEST_WEB_BASE_URL, SHARE_BASE_URL } from '@/services/constants'
 // import { resolveActiveShare } from '@/libs/shareServer'
-import ShareLanding from './ShareLanding'
+import ShareLanding from './ShareLanding';
 
 // Server-rendered metadata for chat unfurls. Lives on the page (not the
 // layout) because Next only passes `searchParams` to page-level
@@ -21,7 +21,7 @@ export async function generateMetadata(): Promise<Metadata> {
   return {
     title: 'Open in Readest',
     description: 'Open-source ebook reader for everyone, on every device.',
-  }
+  };
 }
 
 export default function Page() {
@@ -31,5 +31,5 @@ export default function Page() {
     <Suspense fallback={null}>
       <ShareLanding />
     </Suspense>
-  )
+  );
 }

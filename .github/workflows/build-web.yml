@@ -39,6 +39,5 @@ jobs:
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
-          name: readest-web-${{ github.sha }}
+          name: readest-web
           path: apps/readest-app/out
-          retention-days: 30
