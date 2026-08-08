@@ -566,7 +566,9 @@ export const useTextSelector = (
       // iOS selections go through the same path as desktop.
       if (isPointerInside) {
         isUpToPopup.current = true;
-        makeSelection(sel, index, true, false, trimPoint);
+        // Do not set rebuildRange: On GeckoView navite selection handles disappear
+        makeSelection(sel, index, false, false, trimPoint);
+        /* makeSelection(sel, index, true, false, trimPoint); */
       } else if (appService?.isAndroidApp) {
         isUpToPopup.current = false;
       }
@@ -728,7 +730,10 @@ export const useTextSelector = (
     isUpToPopup.current = true;
   };
 
-  const handleContextmenu = (event: Event) => {
+  const handleContextmenu = (_event: Event) => {
+    // GeckoView uses the long-press/contextmenu path for native text
+    // selection. Cancelling it prevents the long-press selection gesture.
+    /*
     if (appService?.isMobile) {
       event.preventDefault();
       event.stopPropagation();
@@ -738,6 +743,7 @@ export const useTextSelector = (
       event.stopPropagation();
       return false;
     }
+    */
     return;
   };
 
