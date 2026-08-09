@@ -1946,11 +1946,15 @@ const Annotator: React.FC<{ bookKey: string; contentInsets: Insets }> = ({
   // and TTS spend the selection (TTS deselects deliberately), and highlight /
   // annotate replace it with the created annotation — so they are not here.
   const handleDismissPopupShowToolbar = () => {
+    /*
     if (isTextSelected.current && toolButtons.length > 0) {
       handleShowAnnotPopup();
     } else {
+    */
       handleDismissPopupAndSelection();
+    /*
     }
+    */
   };
 
   return (
