@@ -8,10 +8,10 @@
 # per-leg manifest fragments so a single failing leg never clobbers the manifest.
 name: Nightly Readest
 
-# on:
-#   schedule:
-#     - cron: '0 22 * * *' # 22:00 UTC = 06:00 GMT+8
-#   workflow_dispatch:
+on:
+  schedule:
+    - cron: '0 22 * * *' # 22:00 UTC = 06:00 GMT+8
+  workflow_dispatch:
 
 permissions:
   contents: read
