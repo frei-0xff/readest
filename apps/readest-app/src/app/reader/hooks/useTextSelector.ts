@@ -493,12 +493,40 @@ export const useTextSelector = (
   const handleDoubleClick = async (doc: Document, index: number, x: number, y: number) => {
     if (isInstantAnnotating.current) return;
     const sel = doc.getSelection();
-    if (!sel || isValidSelection(sel)) return;
-    const range = getWordRangeFromPoint(doc, x, y);
-    if (!range) return;
+    if (!sel) return;
+
+    const wordRange = getWordRangeFromPoint(doc, x, y);
+    if (!wordRange) return;
+
+    if (isValidSelection(sel)) {
+      const nativeRange = sel.getRangeAt(0);
+      // Gecko's native word selection can stop at a CSS-generated hyphen, even
+      // though the underlying text node contains the whole word. If the native
+      // selection is a strict subset of the word under the double-click point,
+      // replace it with the DOM/Intl.Segmenter word range. Requiring containment
+      // keeps stale selections outside the clicked word and deliberate ranges
+      // extended into whitespace untouched.
+      const isWithinWord =
+        nativeRange.compareBoundaryPoints(Range.START_TO_START, wordRange) >= 0 &&
+        nativeRange.compareBoundaryPoints(Range.END_TO_END, wordRange) <= 0;
+      if (!isWithinWord || nativeRange.toString() === wordRange.toString()) return;
+
+      guardProgrammaticSelection();
+      sel.setBaseAndExtent(
+        wordRange.startContainer,
+        wordRange.startOffset,
+        wordRange.endContainer,
+        wordRange.endOffset,
+      );
+      releaseProgrammaticSelection();
+      if (sel.rangeCount === 0) return;
+      await makeSelection(sel, index, false);
+      return;
+    }
+
     guardProgrammaticSelection();
     sel.removeAllRanges();
-    sel.addRange(range);
+    sel.addRange(wordRange);
     releaseProgrammaticSelection();
     // With the instant-highlight stylesheet suppression active, WebKit may
     // refuse the programmatic selection on non-selectable content.
