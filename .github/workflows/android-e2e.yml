@@ -7,10 +7,10 @@ name: Android E2E (CDP)
 
 on:
   workflow_dispatch:
-  schedule:
-    - cron: '30 19 * * *'
-  pull_request:
-    types: [labeled, synchronize]
+  # schedule:
+  #   - cron: '30 19 * * *'
+  # pull_request:
+  #   types: [labeled, synchronize]
 
 concurrency:
   group: android-e2e-${{ github.ref }}
