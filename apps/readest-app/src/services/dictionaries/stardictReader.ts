@@ -318,6 +318,47 @@ export class StarDictReader {
     return undefined;
   }
 
+  async lookupAll(word: string): Promise<StarDictEntry[]> {
+    let lo = 0;
+    let hi = this.idxCount - 1;
+    let found = -1;
+
+    // Find any case-insensitive match.
+    while (lo <= hi) {
+      const mid = (lo + hi) >>> 1;
+      const entry = await this.decodeIdxEntry(mid);
+      const cmp = cmpAscii(word, entry.word);
+
+      if (cmp === 0) {
+        found = mid;
+        break;
+      }
+
+      if (cmp > 0) lo = mid + 1;
+      else hi = mid - 1;
+    }
+
+    if (found < 0) return [];
+
+    // Find the first matching entry.
+    let first = found;
+    while (first > 0) {
+      const entry = await this.decodeIdxEntry(first - 1);
+      if (cmpAscii(word, entry.word) !== 0) break;
+      first--;
+    }
+
+    // Collect all matching entries.
+    const entries: StarDictEntry[] = [];
+    for (let i = first; i < this.idxCount; i++) {
+      const entry = await this.decodeIdxEntry(i);
+      if (cmpAscii(word, entry.word) !== 0) break;
+      entries.push(entry);
+    }
+
+    return entries;
+  }
+
   private async ensureSynBuilt(): Promise<void> {
     if (this.synBuilt) return;
     if (!this.synBlob) {

@@ -199,16 +199,39 @@ export const createStarDictProvider = ({
       }
 
       try {
-        let entry: StarDictEntry | undefined = await r.lookup(word);
-        if (!entry) entry = await r.resolveSynonym(word);
-        if (ctx.signal.aborted) return { ok: false, reason: 'error', message: 'aborted' };
-        if (!entry) return { ok: false, reason: 'empty' };
+        let entries: StarDictEntry[] = await r.lookupAll(word);
 
-        const bytes = await r.read(entry);
+        if (!entries.length) {
+          const synonym = await r.resolveSynonym(word);
+          if (synonym) entries = [synonym];
+        }
+
         if (ctx.signal.aborted) return { ok: false, reason: 'error', message: 'aborted' };
-        if (!bytes.length) return { ok: false, reason: 'empty' };
-        renderEntry(ctx.container, entry.word, bytes, seq, false, ctx.onNavigate);
-        return { ok: true, headword: entry.word, sourceLabel: r.ifo['bookname'] || dict.name };
+        if (!entries.length) return { ok: false, reason: 'empty' };
+
+        let rendered = 0;
+
+        for (const entry of entries) {
+          if (ctx.signal.aborted) {
+            return { ok: false, reason: 'error', message: 'aborted' };
+          }
+
+          const bytes = await r.read(entry);
+
+          if (!bytes.length) continue;
+
+          renderEntry(ctx.container, entry.word, bytes, seq, rendered > 0, ctx.onNavigate);
+
+          rendered++;
+        }
+
+        if (!rendered) return { ok: false, reason: 'empty' };
+
+        return {
+          ok: true,
+          headword: entries[0]!.word,
+          sourceLabel: r.ifo['bookname'] || dict.name,
+        };
       } catch (err) {
         return {
           ok: false,
