@@ -32,12 +32,37 @@ const SAFE_TYPES = new Set(['m', 'h', 'x', 't']);
 
 const decoder = new TextDecoder('utf-8');
 
+const wireStarDictLinks = (container: HTMLElement, onNavigate?: (word: string) => void): void => {
+  if (!onNavigate) return;
+
+  const refs = Array.from(container.querySelectorAll<HTMLElement>('kref'));
+
+  for (const ref of refs) {
+    const target = ref.textContent?.trim();
+    if (!target) continue;
+
+    const anchor = document.createElement('a');
+    anchor.className = 'not-eink:text-primary underline cursor-pointer';
+
+    // Keep the original <kref> element intact.
+    ref.parentNode?.insertBefore(anchor, ref);
+    anchor.appendChild(ref);
+
+    anchor.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      onNavigate(target);
+    });
+  }
+};
+
 const renderEntry = (
   container: HTMLElement,
   word: string,
   bytes: Uint8Array,
   type: string,
   isAdditional: boolean,
+  onNavigate?: (word: string) => void,
 ): void => {
   const text = decoder.decode(bytes);
 
@@ -57,6 +82,7 @@ const renderEntry = (
     const div = document.createElement('div');
     div.innerHTML = text;
     div.className = 'mt-2 text-sm';
+    wireStarDictLinks(div, onNavigate);
     container.appendChild(div);
     return;
   }
@@ -181,7 +207,7 @@ export const createStarDictProvider = ({
         const bytes = await r.read(entry);
         if (ctx.signal.aborted) return { ok: false, reason: 'error', message: 'aborted' };
         if (!bytes.length) return { ok: false, reason: 'empty' };
-        renderEntry(ctx.container, entry.word, bytes, seq, false);
+        renderEntry(ctx.container, entry.word, bytes, seq, false, ctx.onNavigate);
         return { ok: true, headword: entry.word, sourceLabel: r.ifo['bookname'] || dict.name };
       } catch (err) {
         return {
