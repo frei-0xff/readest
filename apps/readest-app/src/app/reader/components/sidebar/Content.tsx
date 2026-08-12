@@ -24,7 +24,9 @@ const SidebarContent: React.FC<{
   const { settings } = useSettingsStore();
   const config = getConfig(sideBarBookKey);
   const [activeTab, setActiveTab] = useState(config?.viewSettings?.sideBarTab || 'toc');
+  /*
   const [fade, setFade] = useState(false);
+  */
   const [targetTab, setTargetTab] = useState(activeTab);
   const isMobile = window.innerWidth < 640 || window.innerHeight < 640;
   const aiEnabled = settings?.aiSettings?.enabled ?? false;
@@ -56,6 +58,7 @@ const SidebarContent: React.FC<{
     // The header search icon is contextual (annotation search vs in-book
     // search), so an open search bar never survives a tab switch.
     setSearchBarVisible(false);
+    /*
     setFade(true);
     const timeout = setTimeout(() => {
       setTargetTab(tab);
@@ -63,10 +66,14 @@ const SidebarContent: React.FC<{
       setConfig(sideBarBookKey!, config);
       clearTimeout(timeout);
     }, 300);
+    */
 
     setActiveTab(tab);
     const config = getConfig(sideBarBookKey!)!;
     config.viewSettings!.sideBarTab = tab;
+
+    setTargetTab(tab);
+    setConfig(sideBarBookKey!, config);
   };
 
   return (
@@ -92,6 +99,7 @@ const SidebarContent: React.FC<{
             }}
             defer
           >
+            {/*
             <div
               className={clsx(
                 'scroll-container h-full transition-opacity duration-300 ease-in-out',
@@ -101,6 +109,8 @@ const SidebarContent: React.FC<{
                 },
               )}
             >
+            */}
+            <div className='scroll-container h-full'>
               {targetTab === 'toc' && bookDoc.toc && (
                 <TOCView toc={bookDoc.toc} bookKey={sideBarBookKey} />
               )}

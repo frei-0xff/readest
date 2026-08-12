@@ -245,7 +245,6 @@ const ChatHistoryView: React.FC<ChatHistoryViewProps> = ({ bookKey }) => {
             'hover:bg-primary/90',
             'border-primary/20 border',
             'shadow-md',
-            'transition-all duration-200 ease-out',
             'active:scale-[0.97]',
           )}
           aria-label={_('New Chat')}

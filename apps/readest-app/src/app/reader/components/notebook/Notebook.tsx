@@ -367,7 +367,9 @@ const Notebook: React.FC = ({}) => {
               border-top-right-radius: 16px;
             }
             .overlay {
+              /*
               transition: opacity 0.3s ease-in-out;
+              */
             }
           }
         `}</style>

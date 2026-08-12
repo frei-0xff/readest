@@ -189,7 +189,7 @@ const SideBar = ({}) => {
         ref={sidebarRef}
         className={clsx(
           'sidebar-container flex min-w-60 select-none flex-col',
-          'full-height transition-[padding-top] duration-300',
+          'full-height',
           viewSettings?.isEink ? 'bg-base-100' : 'bg-base-200',
           appService?.hasRoundedWindow && 'rounded-window-top-left rounded-window-bottom-left',
           isSideBarPinned ? 'z-20' : 'z-[45] shadow-2xl',
@@ -218,7 +218,16 @@ const SideBar = ({}) => {
               border-top-right-radius: 16px;
             }
             .overlay {
+              /*
               transition: opacity 0.3s ease-in-out;
+              */
+            }
+
+            /* Hack to fix sidebar performance issues */
+            .sidebar-container :global(*) {
+              opacity: 1 !important;
+              filter: none !important;
+              mix-blend-mode: normal !important;
             }
           }
         `}</style>
