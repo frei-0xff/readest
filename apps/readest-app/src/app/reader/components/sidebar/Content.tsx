@@ -81,7 +81,10 @@ const SidebarContent: React.FC<{
       <div
         className={clsx(
           'sidebar-content flex h-full min-h-0 flex-grow flex-col shadow-inner',
+          /*
           'font-sans text-base font-normal sm:text-sm',
+          */
+          'font-sans text-sm font-normal',
         )}
       >
         {targetTab === 'history' ? (

@@ -262,7 +262,7 @@ const BooknoteItem: React.FC<BooknoteItemProps> = ({
       >
         {item.note && (
           <div
-            className='content prose prose-sm font-size-sm'
+            className='content prose prose-sm font-size-xs'
             dir='auto'
             dangerouslySetInnerHTML={{ __html: noteHtml }}
           ></div>
@@ -276,7 +276,7 @@ const BooknoteItem: React.FC<BooknoteItemProps> = ({
               }}
             ></div>
           )}
-          <div className={clsx('content font-size-sm line-clamp-3', item.note && 'mt-2')}>
+          <div className={clsx('content font-size-xs line-clamp-3', item.note && 'mt-2')}>
             <span
               className={clsx(
                 'booknote-text inline leading-normal',
