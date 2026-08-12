@@ -217,7 +217,7 @@ const makeFuzzyExcerpt = (
 // so Next.js would evaluate that global while collecting page data on the
 // server. Load the walker lazily instead — every caller of
 // prepareSearchSection awaits loadTextWalker() first.
-type TextWalker = typeof import('foliate-js/text-walker.js')['textWalker'];
+type TextWalker = (typeof import('foliate-js/text-walker.js'))['textWalker'];
 let textWalker: TextWalker | null = null;
 const loadTextWalker = async (): Promise<TextWalker> =>
   (textWalker ??= (await import('foliate-js/text-walker.js')).textWalker);
@@ -584,7 +584,9 @@ export async function* searchLibraryBooks(
     let file: File | null = null;
     let bookDoc: SearchableBookDoc | null = null;
     let indexDb: DatabaseService | null = null;
+    /*
     const ownsIndexDb = !options.session;
+    */
     try {
       yield { type: 'book-started', book, bookIndex, totalBooks: books.length };
       const locale = book.primaryLanguage || 'en';
@@ -593,6 +595,7 @@ export async function* searchLibraryBooks(
       // cheaply first: a book with neither a local file nor an existing index
       // is skipped without touching the database layer at all.
       const localSize = await appService.getBookFileSize(book).catch(() => null);
+      /*
       if (localSize == null) {
         const hasIndex = await appService
           .databaseExists(`${book.hash}/search.db`, 'Books')
@@ -607,6 +610,7 @@ export async function* searchLibraryBooks(
       indexDb = options.session
         ? await options.session.getIndexDb(book)
         : await openLibrarySearchDb(appService, book).catch(() => null);
+      */
       const meta = indexDb ? await readSearchIndexMeta(indexDb).catch(() => null) : null;
 
       // Node trees follow the nav the reader shows (hydrateBookNav), which
@@ -676,6 +680,7 @@ export async function* searchLibraryBooks(
         // A stale or incomplete index and no local file to rescan from: the
         // db is a useless artifact that would cost a full database open on
         // every future search, so delete it and skip.
+        /*
         if (indexDb) {
           if (options.session) options.session.dropIndexDb(book);
           else {
@@ -684,6 +689,7 @@ export async function* searchLibraryBooks(
           }
           await appService.deleteDatabase(`${book.hash}/search.db`, 'Books').catch(() => {});
         }
+        */
         skippedBooks++;
         yield { type: 'book-skipped', book, reason: 'unavailable' };
         continue;
@@ -838,10 +844,12 @@ export async function* searchLibraryBooks(
       };
     } finally {
       if (!options.session) await closeBook(bookDoc, file);
+      /*
       if (ownsIndexDb && indexDb) {
         await checkpointSearchIndex(indexDb);
         await indexDb.close().catch(() => {});
       }
+      */
     }
   }
 
