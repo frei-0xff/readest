@@ -358,6 +358,9 @@ const getColorStyles = (
       color: unset;
       background-color: unset;
     }
+    ::selection {
+      background-color: rgba(51, 185, 229, 0.306);
+    }
   `;
   return colorStyles;
 };
