@@ -49,8 +49,10 @@ export function resolveThemeIsDarkMode(
   return systemIsDarkMode;
 }
 
+/*
 const THEME_MODES_BASE: ThemeMode[] = ['auto', 'light', 'dark'];
 const THEME_MODES_WITH_AMBIENT: ThemeMode[] = ['auto', 'light', 'dark', 'ambient'];
+*/
 
 /**
  * Cycle Auto → Light → Dark → (Ambient Mode) → Auto.
@@ -62,6 +64,7 @@ const THEME_MODES_WITH_AMBIENT: ThemeMode[] = ['auto', 'light', 'dark', 'ambient
  * Returns:
  * - the next ThemeMode in the cycle.
  */
+/*
 export function nextThemeMode(current: ThemeMode, hasAmbient: boolean): ThemeMode {
   const modes = hasAmbient ? THEME_MODES_WITH_AMBIENT : THEME_MODES_BASE;
   const effective: ThemeMode = current === 'ambient' && !hasAmbient ? 'auto' : current;
@@ -69,7 +72,10 @@ export function nextThemeMode(current: ThemeMode, hasAmbient: boolean): ThemeMod
   const nextIdx = idx < 0 ? 0 : (idx + 1) % modes.length;
   return modes[nextIdx] ?? 'auto';
 }
-
+*/
+export function nextThemeMode(current: ThemeMode, _hasAmbient: boolean): ThemeMode {
+  return current === 'light' ? 'dark' : 'light';
+}
 /**
  * Read the persisted ambient dark flag, falling back to the system appearance
  * until the first lux reading has been stored. Shared by the theme store and
