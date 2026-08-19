@@ -213,9 +213,13 @@ export function segmentCJKText(text: string, language?: string, cjkCharMode = fa
  *   "hello"       → ["hello"]
  */
 export function getHyphenParts(word: string): string[] {
+  /*
   if (!/[a-zA-Z](?:-|\.\.\.)[a-zA-Z]/.test(word)) return [word];
   // Capturing group preserves the delimiter in the split result array
   const parts = word.split(/([-]|\.\.\.)(?=[a-zA-Z])/);
+  */
+  if (!/[A-Za-zА-Яа-яЁё](?:-|\.\.\.)[A-Za-zА-Яа-яЁё]/.test(word)) return [word];
+  const parts = word.split(/([-]|\.\.\.)(?=[A-Za-zА-Яа-яЁё])/);
   // parts = ["foo", "-", "bar", "...", "baz"] for "foo-bar...baz"
   const result: string[] = [];
   for (let i = 0; i < parts.length; i += 2) {
