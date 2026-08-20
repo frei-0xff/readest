@@ -265,7 +265,10 @@ const RSVPControl = forwardRef<RSVPControlHandle, RSVPControlProps>(function RSV
   const getConfig = useBookDataStore((s) => s.getConfig);
   const setConfig = useBookDataStore((s) => s.setConfig);
   const saveConfig = useBookDataStore((s) => s.saveConfig);
+  /*
   const { themeCode } = useThemeStore();
+  */
+  const { themeCode, themeColor, setThemeColor } = useThemeStore();
 
   const [isActive, setIsActive] = useState(false);
   const [showStartDialog, setShowStartDialog] = useState(false);
@@ -756,6 +759,7 @@ const RSVPControl = forwardRef<RSVPControlHandle, RSVPControlProps>(function RSV
       };
 
       controller.addEventListener('rsvp-start-choice', handleStartChoice);
+      setThemeColor(themeColor);
       controller.requestStart(selectionText);
 
       // Clean up listener after handling
