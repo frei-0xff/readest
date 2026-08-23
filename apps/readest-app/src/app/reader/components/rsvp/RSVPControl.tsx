@@ -1103,11 +1103,13 @@ const RSVPControl = forwardRef<RSVPControlHandle, RSVPControlProps>(function RSV
       {/* RSVP Overlay - render via portal */}
       {isActive &&
         controllerRef.current &&
+        bookData?.bookDoc &&
         portalContainer &&
         createPortal(
           <RSVPOverlay
             gridInsets={gridInsets}
             controller={controllerRef.current}
+            bookDoc={bookData?.bookDoc}
             chapters={chapters}
             currentChapterHref={currentChapterHref}
             fontFamily={fontFamily}

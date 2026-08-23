@@ -7,7 +7,7 @@ import { RsvpState, RSVPController } from '@/services/rsvp';
 import { containsCJK, isRTLText } from '@/services/rsvp/utils';
 import { useThemeStore } from '@/store/themeStore';
 import { useSettingsStore } from '@/store/settingsStore';
-import { TOCItem } from '@/libs/document';
+import { BookDoc, TOCItem } from '@/libs/document';
 import {
   IoClose,
   IoPlay,
@@ -27,11 +27,15 @@ import {
 } from 'react-icons/io5';
 import { useTranslation } from '@/hooks/useTranslation';
 import { getPopupPosition, Position } from '@/utils/sel';
+import { getFootnoteStyles, getThemeCode } from '@/utils/style';
+import { FoliateView } from '@/types/view';
 import { Overlay } from '@/components/Overlay';
+import Popup from '@/components/Popup';
 import DictionarySheet from '@/app/reader/components/annotator/DictionarySheet';
 import DictionaryPopup from '@/app/reader/components/annotator/DictionaryPopup';
 import TTSFollowIndicator, { TtsSyncStatus } from '@/app/reader/components/tts/TTSFollowIndicator';
 import { Toggle } from '@/components/primitives/toggle';
+import { FootnoteHandler } from 'foliate-js/footnotes.js';
 
 interface FlatChapter {
   label: string;
@@ -97,6 +101,7 @@ const DICT_POPUP_MAX_HEIGHT = 360;
 interface RSVPOverlayProps {
   gridInsets: Insets;
   controller: RSVPController;
+  bookDoc: BookDoc;
   chapters: TOCItem[];
   currentChapterHref: string | null;
   /**
@@ -135,6 +140,7 @@ interface RSVPOverlayProps {
 const RSVPOverlay: React.FC<RSVPOverlayProps> = ({
   gridInsets,
   controller,
+  bookDoc,
   chapters,
   currentChapterHref,
   fontFamily,
@@ -227,6 +233,32 @@ const RSVPOverlay: React.FC<RSVPOverlayProps> = ({
     position: Position;
     trianglePosition: Position;
   } | null>(null);
+  // Native foliate-js footnote rendering. The handler extracts a real DOM
+  // fragment into a FoliateView, preserving markup such as <b>, <i>, <em>,
+  // links, lists, paragraphs, and other EPUB footnote structure.
+  const FOOTNOTE_POPUP_WIDTH = 360;
+  const FOOTNOTE_POPUP_HEIGHT = 88;
+  const FOOTNOTE_POPUP_PADDING = 10;
+  const FOOTNOTE_MAX_SIZE_ADJUST_COUNT = 3;
+
+  const [footnote, setFootnote] = useState<{
+    position: Position;
+    trianglePosition: Position;
+  } | null>(null);
+  const [showFootnote, setShowFootnote] = useState(false);
+  const [footnoteSize, setFootnoteSize] = useState({
+    width: FOOTNOTE_POPUP_WIDTH,
+    height: FOOTNOTE_POPUP_HEIGHT,
+  });
+  const footnoteRef = useRef<HTMLDivElement>(null);
+  const footnoteViewRef = useRef<FoliateView | null>(null);
+  const footnotePositionRef = useRef<{
+    position: Position;
+    trianglePosition: Position;
+  } | null>(null);
+  const footnoteHrefRef = useRef<string | null>(null);
+  const footnoteSizeAdjustCountRef = useRef(0);
+  const [footnoteHandler] = useState(() => new FootnoteHandler());
   const touchStartX = useRef(0);
   const touchStartY = useRef(0);
   const touchStartTime = useRef(0);
@@ -235,6 +267,185 @@ const RSVPOverlay: React.FC<RSVPOverlayProps> = ({
   const [isProgressBarDragging, setIsProgressBarDragging] = useState(false);
   const SWIPE_THRESHOLD = 50;
   const TAP_THRESHOLD = 10;
+
+  const getFootnoteMaxHeight = useCallback(() => {
+    let availableHeight = window.innerHeight - 2 * FOOTNOTE_POPUP_PADDING;
+    const triangle = footnotePositionRef.current?.trianglePosition;
+
+    if (triangle?.dir === 'up') {
+      availableHeight = triangle.point.y - FOOTNOTE_POPUP_PADDING;
+    } else if (triangle?.dir === 'down') {
+      availableHeight = window.innerHeight - triangle.point.y - FOOTNOTE_POPUP_PADDING;
+    }
+
+    return Math.max(1, availableHeight);
+  }, []);
+
+  const getFootnoteMaxWidth = useCallback(() => {
+    return Math.max(1, Math.min(window.innerWidth - 2 * FOOTNOTE_POPUP_PADDING, 720));
+  }, []);
+
+  useEffect(() => {
+    const handleBeforeRender = (event: Event) => {
+      const { view } = (event as CustomEvent).detail as { view: FoliateView };
+      const renderer = view.renderer;
+
+      renderer.setAttribute('flow', 'scrolled');
+      renderer.setAttribute('no-preload', '');
+      renderer.setAttribute('no-background', '');
+      renderer.setAttribute('margin-top', '0px');
+      renderer.setAttribute('margin-right', '0px');
+      renderer.setAttribute('margin-bottom', '0px');
+      renderer.setAttribute('margin-left', '0px');
+      renderer.setAttribute('gap', '0%');
+      const themeCode = getThemeCode();
+      const popupTheme = { ...themeCode };
+      const popupContainer = document.getElementById('popup-container');
+      if (popupContainer) {
+        const backgroundColor = getComputedStyle(popupContainer).backgroundColor;
+        popupTheme.bg = backgroundColor;
+      }
+      const { bg, fg, primary, isDarkMode } = popupTheme;
+      const colorStyles = `
+        html {
+          --theme-bg-color: ${bg};
+          --theme-fg-color: ${fg};
+          --theme-primary-color: ${primary};
+          color-scheme: ${isDarkMode ? 'dark' : 'light'};
+        }
+        html, body {
+          color: ${fg};
+          font-family: sans-serif !important;
+        }
+        html {
+          background-color: var(--theme-bg-color, transparent);
+          background: var(--background-set, none);
+        }
+      `;
+      const footnoteStyles = getFootnoteStyles();
+      renderer.setStyles?.(`${colorStyles}\n${footnoteStyles}`);
+
+      // Mount during before-render. FootnoteHandler loads/navigates the
+      // FoliateView immediately after this event; mounting it only from
+      // render can leave the renderer detached and produce an empty popup.
+      footnoteViewRef.current = view;
+      footnoteRef.current?.replaceChildren(view);
+    };
+
+    const handleRender = (event: Event) => {
+      const { view, href } = (event as CustomEvent).detail as {
+        view: FoliateView;
+        href?: string;
+      };
+
+      if (footnoteHrefRef.current && href && href !== footnoteHrefRef.current) {
+        if (view === footnoteViewRef.current) {
+          try {
+            view.close();
+          } catch {
+            /* ignore */
+          }
+          view.remove();
+          footnoteViewRef.current = null;
+        }
+        return;
+      }
+
+      if (view !== footnoteViewRef.current) {
+        const container = footnoteRef.current;
+        if (!container) return;
+        const current = footnoteViewRef.current;
+        if (current && current !== view) {
+          try {
+            current.close();
+          } catch {
+            /* ignore */
+          }
+          current.remove();
+        }
+        footnoteViewRef.current = view;
+        container.replaceChildren(view);
+      }
+
+      // Readest's FootnotePopup sizes the popup from renderer.viewSize on the
+      // first relocate event. It deliberately starts from 360x88 and adjusts
+      // at most three times while Foliate finishes layout. Keep the same
+      // algorithm here instead of measuring scrollWidth/scrollHeight.
+      footnoteSizeAdjustCountRef.current = 0;
+
+      const handleRelocate = () => {
+        if (footnoteSizeAdjustCountRef.current >= FOOTNOTE_MAX_SIZE_ADJUST_COUNT) {
+          return;
+        }
+
+        footnoteSizeAdjustCountRef.current += 1;
+
+        const { renderer } = view;
+        const responsiveHeight = Math.max(1, Math.min(renderer.viewSize, getFootnoteMaxHeight()));
+
+        setFootnoteSize((previous) => {
+          let width = previous.width;
+
+          const scrollRatio = renderer.viewSize / responsiveHeight;
+          if (scrollRatio > 1.5) {
+            width = Math.max(
+              1,
+              Math.min(FOOTNOTE_POPUP_WIDTH * scrollRatio, getFootnoteMaxWidth()),
+            );
+          }
+
+          return { width, height: responsiveHeight };
+        });
+
+        setShowFootnote(true);
+      };
+
+      view.addEventListener('relocate', handleRelocate);
+    };
+
+    footnoteHandler.addEventListener('before-render', handleBeforeRender);
+    footnoteHandler.addEventListener('render', handleRender);
+
+    return () => {
+      footnoteHandler.removeEventListener('before-render', handleBeforeRender);
+      footnoteHandler.removeEventListener('render', handleRender);
+
+      const view = footnoteViewRef.current;
+      if (view) {
+        try {
+          view.close();
+        } catch {
+          /* ignore */
+        }
+        view.remove();
+        footnoteViewRef.current = null;
+      }
+    };
+  }, [footnoteHandler, themeCode.bg, themeCode.fg, getFootnoteMaxHeight, getFootnoteMaxWidth]);
+
+  // Reposition whenever Readest-style responsive sizing changes. The triangle
+  // itself stays anchored to the original footnote marker.
+  useEffect(() => {
+    if (!footnote?.trianglePosition) return;
+
+    const position = getPopupPosition(
+      footnote.trianglePosition,
+      {
+        top: 0,
+        left: 0,
+        right: window.innerWidth,
+        bottom: window.innerHeight,
+      },
+      footnoteSize.width,
+      footnoteSize.height,
+      FOOTNOTE_POPUP_PADDING,
+    );
+
+    setFootnote((previous) => {
+      if (!previous) return previous;
+      return { ...previous, position };
+    });
+  }, [footnote?.trianglePosition, footnoteSize]);
 
   // Flatten chapters for dropdown
   const flatChapters = useMemo(() => {
@@ -475,6 +686,7 @@ const RSVPOverlay: React.FC<RSVPOverlayProps> = ({
 
   const handleTouchEnd = (event: React.TouchEvent) => {
     if (event.changedTouches.length !== 1) return;
+    if (showFootnote) return;
 
     // Touches starting on the header or footer controls (progress bar, buttons,
     // dropdowns) own their own gestures — never let a horizontal drag here be
@@ -522,20 +734,178 @@ const RSVPOverlay: React.FC<RSVPOverlayProps> = ({
     [state.playing, controller],
   );
 
+  const closeFootnote = useCallback(() => {
+    footnoteHrefRef.current = null;
+    footnotePositionRef.current = null;
+    footnoteSizeAdjustCountRef.current = 0;
+    setShowFootnote(false);
+
+    const view = footnoteViewRef.current;
+    if (view) {
+      try {
+        view.close();
+      } catch {
+        /* ignore */
+      }
+      view.remove();
+      footnoteViewRef.current = null;
+    }
+
+    footnoteRef.current?.replaceChildren();
+    setFootnote(null);
+    setFootnoteSize({
+      width: FOOTNOTE_POPUP_WIDTH,
+      height: FOOTNOTE_POPUP_HEIGHT,
+    });
+  }, []);
+
+  const openFootnote = useCallback(
+    async (wordIndex: number, target: HTMLElement): Promise<boolean> => {
+      const word = state.words[wordIndex];
+      const range = word?.range;
+      if (!range) return false;
+
+      const element =
+        range.startContainer.nodeType === Node.ELEMENT_NODE
+          ? (range.startContainer as Element)
+          : range.startContainer.parentElement;
+      const anchor = element?.closest<HTMLAnchorElement>('a[href]');
+      if (!anchor) return false;
+
+      const rawHref = anchor.getAttribute('href');
+      if (!rawHref) return false;
+
+      let href = rawHref;
+      if (!/^[a-z][a-z\d+.-]*:\/\//i.test(rawHref)) {
+        let chapterPath = currentChapterHref?.split('#')[0] ?? '';
+        if (rawHref.startsWith('#')) {
+          href = `${chapterPath}${rawHref}`;
+        } else {
+          const url = new URL(rawHref, `https://readest.invalid/${chapterPath}`);
+          href = `${url.pathname.slice(1)}${url.hash}`;
+        }
+      }
+
+      const epubType =
+        anchor.getAttributeNS('http://www.idpf.org/2007/ops', 'type') ??
+        anchor.getAttribute('epub:type');
+      const role = anchor.getAttribute('role');
+      const types = new Set(epubType?.split(/\s+/).filter(Boolean) ?? []);
+      const roles = new Set(role?.split(/\s+/).filter(Boolean) ?? []);
+
+      const isFootnote =
+        types.has('noteref') || roles.has('doc-noteref') || anchor.classList.contains('footnote');
+
+      if (!isFootnote) return false;
+
+      footnoteHrefRef.current = href;
+
+      if (state.playing) controller.pause();
+      controller.seekToIndex(wordIndex);
+
+      // seekToIndex() can rebuild/re-window the context panel, which may move
+      // the clicked word to a different DOM position. The `target` from the
+      // click event can therefore be stale by the time the popup is positioned.
+      // Wait for React + layout to settle, then resolve the word again from the
+      // current DOM before measuring its rect.
+      await new Promise<void>((resolve) => {
+        requestAnimationFrame(() => resolve());
+      });
+
+      const currentTarget =
+        contextWordRef.current?.getAttribute('data-rsvp-word-index') === String(wordIndex)
+          ? contextWordRef.current
+          : contextPanelRef.current?.querySelector<HTMLElement>(
+              `[data-rsvp-word-index="${wordIndex}"]`,
+            );
+
+      const rect = (currentTarget ?? target).getBoundingClientRect();
+      const spaceAbove = rect.top;
+      const spaceBelow = window.innerHeight - rect.bottom;
+      const dir: Position['dir'] = spaceAbove > spaceBelow ? 'up' : 'down';
+      const trianglePosition: Position = {
+        point: {
+          x: rect.left + rect.width / 2,
+          y: dir === 'up' ? rect.top - 12 : rect.bottom + 6,
+        },
+        dir,
+      };
+
+      // Match Readest FootnotePopup: start with its compact 360x88 base size,
+      // then let Foliate's relocate event derive the real height from
+      // renderer.viewSize. Do not show the popup until that first measurement.
+      const popupWidth = Math.max(1, Math.min(FOOTNOTE_POPUP_WIDTH, getFootnoteMaxWidth()));
+      const popupHeight = Math.max(1, Math.min(FOOTNOTE_POPUP_HEIGHT, getFootnoteMaxHeight()));
+      const position = getPopupPosition(
+        trianglePosition,
+        { top: 0, left: 0, right: window.innerWidth, bottom: window.innerHeight },
+        popupWidth,
+        popupHeight,
+        FOOTNOTE_POPUP_PADDING,
+      );
+
+      const oldView = footnoteViewRef.current;
+      if (oldView) {
+        try {
+          oldView.close();
+        } catch {
+          /* ignore */
+        }
+        oldView.remove();
+        footnoteViewRef.current = null;
+      }
+
+      footnoteSizeAdjustCountRef.current = 0;
+      setShowFootnote(false);
+      setFootnoteSize({ width: popupWidth, height: popupHeight });
+      footnotePositionRef.current = { position, trianglePosition };
+      setFootnote({ position, trianglePosition });
+
+      try {
+        const event = new CustomEvent('link', {
+          cancelable: true,
+          detail: { a: anchor, href, follow: true },
+        });
+        await footnoteHandler.handle(bookDoc, event);
+      } catch (error) {
+        console.error('[RSVP] Failed to open footnote:', href, error);
+        closeFootnote();
+      }
+
+      // It was a recognized footnote, so never fall through to normal word
+      // seeking even if foliate-js cannot resolve the target.
+      return true;
+    },
+    [
+      state.words,
+      state.playing,
+      controller,
+      bookDoc,
+      footnoteHandler,
+      closeFootnote,
+      getFootnoteMaxWidth,
+      getFootnoteMaxHeight,
+    ],
+  );
+
   const handleContextClick = useCallback(
-    (event: React.MouseEvent<HTMLDivElement>) => {
-      // A drag that selects text also ends in a click; don't seek then, so the
-      // user can select words for dictionary lookup (#4475).
+    async (event: React.MouseEvent<HTMLDivElement>) => {
       const selection = window.getSelection();
       if (selection && !selection.isCollapsed && selection.toString().trim()) return;
+
       const target = (event.target as HTMLElement).closest<HTMLElement>('[data-rsvp-word-index]');
       if (!target) return;
-      if (target.getAttribute('role') !== 'button') return;
+
       const idx = parseInt(target.getAttribute('data-rsvp-word-index') || '', 10);
       if (Number.isNaN(idx)) return;
+
+      // Footnote links are handled before normal word seeking.
+      if (await openFootnote(idx, target)) return;
+
+      if (target.getAttribute('role') !== 'button') return;
       handleWordClick(idx);
     },
-    [handleWordClick],
+    [handleWordClick, openFootnote],
   );
 
   // Detect a selection inside the context panel and surface a "Look up" pill.
@@ -1323,6 +1693,36 @@ const RSVPOverlay: React.FC<RSVPOverlayProps> = ({
           </div>
         )}
       </div>
+
+      {/*
+       * Keep the Popup mounted even while it is closed.
+       *
+       * This is important for foliate-js: FootnoteHandler emits `before-render`
+       * before it calls `view.goTo()`, and Readest's FootnotePopup already has
+       * `footnoteRef` mounted at that point. If this container is conditional
+       * on `footnote`, the foliate-view can be created while the ref is null;
+       * mounting it only after React commits the popup is too late and can
+       * leave an empty renderer.
+       */}
+      {showFootnote && <Overlay onDismiss={closeFootnote} />}
+      <Popup
+        isOpen={showFootnote}
+        width={footnoteSize.width}
+        height={footnoteSize.height}
+        position={showFootnote ? footnote?.position : undefined}
+        trianglePosition={showFootnote ? footnote?.trianglePosition : undefined}
+        className='select-text overflow-hidden p-0'
+        onDismiss={closeFootnote}
+      >
+        <div
+          ref={footnoteRef}
+          className='footnote-content overflow-hidden'
+          style={{
+            width: `${footnoteSize.width}px`,
+            height: `${footnoteSize.height}px`,
+          }}
+        />
+      </Popup>
 
       {/* Dictionary lookup from a context selection (#4475) */}
       {lookup && (
