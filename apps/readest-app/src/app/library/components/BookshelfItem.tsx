@@ -426,7 +426,7 @@ const BookshelfItem: React.FC<BookshelfItemProps> = ({
       onContextMenu: (e) => {
         if (appService?.hasContextMenu) {
           handleContextMenu({ x: e.clientX, y: e.clientY });
-        } else if (appService?.isAndroidApp) {
+        } else if (appService?.isMobile || appService?.isAndroidApp) {
           handleSelectItem();
         }
       },
